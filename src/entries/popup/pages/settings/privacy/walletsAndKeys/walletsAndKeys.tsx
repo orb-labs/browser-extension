@@ -18,6 +18,8 @@ import { getWallets } from '~/entries/popup/handlers/wallet';
 import { useRainbowNavigate } from '~/entries/popup/hooks/useRainbowNavigate';
 import { ROUTES } from '~/entries/popup/urls';
 
+import * as wallet from '../../../../handlers/wallet';
+
 export const WalletsAndKeys = () => {
   const navigate = useRainbowNavigate();
   const [wallets, setWallets] = useState<KeychainWallet[]>([]);
@@ -89,6 +91,10 @@ export const WalletsAndKeys = () => {
       }, 500);
     }
   }, [containerRef, state?.fromBackupReminder]);
+
+  const wipe = useCallback(async () => {
+    await wallet.wipe();
+  }, []);
 
   return (
     <Box as="div" paddingHorizontal="20px">
@@ -235,6 +241,32 @@ export const WalletsAndKeys = () => {
             }
             onClick={handleCreateNewWallet}
           />
+        </Menu>
+        <Menu>
+          <MenuItem
+            testId={'wipe-wallets'}
+            first
+            last
+            titleComponent={
+              <MenuItem.Title
+                text={'DELETE ALL WALLETS AND DATA'}
+                color="red"
+              />
+            }
+          />
+          <Box paddingHorizontal="16px" paddingVertical="16px">
+            <Inline alignHorizontal="center" alignVertical="center">
+              <Button
+                width="full"
+                color="red"
+                height="36px"
+                variant="tinted"
+                onClick={wipe}
+              >
+                {'DELETE'}
+              </Button>
+            </Inline>
+          </Box>
         </Menu>
       </MenuContainer>
     </Box>
