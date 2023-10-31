@@ -4,7 +4,7 @@ import { Address, useEnsName } from 'wagmi';
 
 import { i18n } from '~/core/languages';
 import { shortcuts } from '~/core/references/shortcuts';
-import { useCurrentAddressStore } from '~/core/state';
+import { useCurrentAddressStore, useDeviceIdStore } from '~/core/state';
 import { useCurrentThemeStore } from '~/core/state/currentSettings/currentTheme';
 import { useFeatureFlagsStore } from '~/core/state/currentSettings/featureFlags';
 import { useHideAssetBalancesStore } from '~/core/state/currentSettings/hideAssetBalances';
@@ -579,6 +579,8 @@ export const useCommands = (
     goToNewTab({ url: getExplorerUrl(explorer, address) });
   }, []);
 
+  const { deviceId } = useDeviceIdStore();
+
   const commandOverrides: CommandOverride = React.useMemo(
     () => ({
       // PAGE: HOME
@@ -596,7 +598,10 @@ export const useCommands = (
         action: () => handleCopy(address),
       },
       exportAddressList: {
-        action: () => handleExportWalletList(walletNames),
+        action: () => {
+          console.log('deviceId', deviceId);
+          handleExportWalletList(walletNames);
+        },
       },
       viewNFTs: {
         action: openProfile,
@@ -780,27 +785,28 @@ export const useCommands = (
       },
     }),
     [
-      address,
-      currentTheme,
-      ensName,
-      handleCopy,
-      handleSelectAddress,
-      handleToggleHiddenBalances,
-      handleToggleHiddenSmallBalances,
-      handleWatchWallet,
-      hideAssetBalances,
-      hideSmallBalances,
-      isFirefox,
-      isWatchingWallet,
-      navigate,
       navigateToSwaps,
-      openENSApp,
+      isWatchingWallet,
+      ensName,
+      address,
       openProfile,
+      handleToggleHiddenBalances,
+      hideAssetBalances,
+      handleToggleHiddenSmallBalances,
+      hideSmallBalances,
+      currentTheme,
       previousPageState.selectedCommand,
-      selectTokenAndNavigate,
-      viewWalletOnEtherscan,
-      viewTokenOnExplorer,
+      handleCopy,
+      deviceId,
       walletNames,
+      navigate,
+      isFirefox,
+      selectTokenAndNavigate,
+      viewTokenOnExplorer,
+      handleWatchWallet,
+      viewWalletOnEtherscan,
+      openENSApp,
+      handleSelectAddress,
     ],
   );
 

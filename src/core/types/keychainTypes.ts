@@ -10,4 +10,5 @@ export type KeychainWallet = {
   accounts: `0x${string}`[];
   imported: boolean;
   vendor?: 'Ledger' | 'Trezor';
+  deviceId?: string;
 };

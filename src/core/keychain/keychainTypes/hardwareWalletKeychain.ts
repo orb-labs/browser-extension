@@ -26,14 +26,15 @@ const privates = new WeakMap();
 export class HardwareWalletKeychain implements IKeychain {
   type: string;
   vendor?: string;
+  deviceId: string;
 
   constructor() {
     this.type = KeychainType.HardwareWalletKeychain;
     this.vendor = undefined;
+    this.deviceId = '';
 
     privates.set(this, {
       wallets: [],
-      deviceId: '',
       accountsEnabled: 1,
       accountsDeleted: [],
       hdPath: '', // No longer used but kept for backwards compatibility
@@ -81,7 +82,7 @@ export class HardwareWalletKeychain implements IKeychain {
     return new HWSigner(
       provider,
       this.getPath(address),
-      privates.get(this).deviceId,
+      this.deviceId,
       address,
       this.vendor as string,
     );
@@ -103,7 +104,7 @@ export class HardwareWalletKeychain implements IKeychain {
 
   async serialize(): Promise<SerializedHardwareWalletKeychain> {
     return {
-      deviceId: privates.get(this).deviceId,
+      deviceId: this.deviceId,
       accountsEnabled: privates.get(this).accountsEnabled,
       hdPath: privates.get(this).hdPath,
       type: this.type,
@@ -116,7 +117,7 @@ export class HardwareWalletKeychain implements IKeychain {
   async deserialize(opts?: SerializedHardwareWalletKeychain) {
     if (!opts) return;
     if (opts.hdPath) privates.get(this).hdPath = opts.hdPath;
-    if (opts.deviceId) privates.get(this).deviceId = opts.deviceId;
+    if (opts.deviceId) this.deviceId = opts.deviceId;
     if (opts.wallets) privates.get(this).wallets = opts.wallets;
     if (opts.vendor) this.vendor = opts.vendor;
     if (opts.accountsEnabled)

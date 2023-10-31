@@ -478,6 +478,10 @@ class KeychainManager {
           keychains[i].type === KeychainType.HardwareWalletKeychain
             ? (keychains[i] as HardwareWalletKeychain).vendor
             : undefined,
+        deviceId:
+          keychains[i].type === KeychainType.HardwareWalletKeychain
+            ? (keychains[i] as HardwareWalletKeychain).deviceId
+            : undefined,
       });
     }
     return keychainArrays;

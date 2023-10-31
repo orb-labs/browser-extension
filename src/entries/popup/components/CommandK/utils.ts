@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Address } from 'wagmi';
 
 import { shortcuts } from '~/core/references/shortcuts';
+import { KeychainWallet } from '~/core/types/keychainTypes';
 
 import { getWallets } from '../../handlers/wallet';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
@@ -431,11 +432,12 @@ export function useKeyboardNavigation(
   }, []);
 }
 
-interface WalletObj {
-  accounts: Address[];
-  type: 'HdKeychain' | 'HardwareWalletKeychain' | 'ReadOnlyKeychain';
-  vendor?: string;
-}
+// interface WalletObj {
+//   accounts: Address[];
+//   type: 'HdKeychain' | 'HardwareWalletKeychain' | 'ReadOnlyKeychain';
+//   vendor?: string;
+//   deviceId?: string;
+// }
 
 type WalletNames = {
   [address: string]: string;
@@ -447,12 +449,15 @@ const typeMapping: { [key: string]: string } = {
 };
 
 export const generateCSV = (
-  data: WalletObj[],
+  data: KeychainWallet[],
   walletNames: WalletNames,
 ): string => {
-  let csvContent = 'public_address,name,type\n';
+  let csvContent = 'public_address,name,type,vendor\n';
+  console.log('data', data);
+  console.log('walletNames', walletNames);
 
-  data.forEach(({ accounts, type, vendor }) => {
+  data.forEach(({ accounts, type, vendor, deviceId }) => {
+    console.log(deviceId);
     const address = accounts[0];
     const name = walletNames[address as Address] || address;
 
@@ -462,6 +467,7 @@ export const generateCSV = (
       importedType = `Hardware Wallet - ${vendor}`;
     }
 
+    // csvContent += `${address},${name},${importedType},${device}\n`;
     csvContent += `${address},${name},${importedType}\n`;
   });
 
@@ -470,7 +476,7 @@ export const generateCSV = (
 
 export const handleExportWalletList = async (walletNames: WalletNames) => {
   const data = await getWallets();
-  const csvContent = generateCSV(data as WalletObj[], walletNames);
+  const csvContent = generateCSV(data as KeychainWallet[], walletNames);
   const blob = new Blob([csvContent], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
 
