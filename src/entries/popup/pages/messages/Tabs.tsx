@@ -291,3 +291,48 @@ export function Tabs({
     </TabContext.Provider>
   );
 }
+
+export function TransactionInfoTabs({
+  children,
+  tabs,
+  initialTab = tabs[0],
+  expanded,
+  onExpand,
+}: PropsWithChildren<{
+  tabs: string[];
+  initialTab?: string;
+  expanded: boolean;
+  onExpand: VoidFunction;
+}>) {
+  const [tab, setTab] = useState(initialTab);
+
+  return (
+    <TabContext.Provider value={{ tabs, selectedTab: tab }}>
+      <TabsPrimitive.Root
+        defaultValue={initialTab}
+        onValueChange={setTab}
+        orientation="horizontal"
+        asChild
+      >
+        <Box
+          as={motion.div}
+          display="flex"
+          flexDirection="column"
+          width="full"
+          paddingTop="20px"
+        >
+          {tabs.length > 1 && <TabsNav />}
+          <AnimatePresence mode="wait">
+            <ScrollableWithGradient
+              key={tab}
+              expanded={expanded}
+              onExpand={onExpand}
+            >
+              {children}
+            </ScrollableWithGradient>
+          </AnimatePresence>
+        </Box>
+      </TabsPrimitive.Root>
+    </TabContext.Provider>
+  );
+}

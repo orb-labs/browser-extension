@@ -70,91 +70,118 @@ export function SendTransaction({
     flashbotsEnabled &&
     activeSession?.chainId === ChainId.mainnet;
 
+  const transactionRequests = useMemo(() => {
+    const txRequest = request?.params?.[0] as TransactionRequest;
+    return JSON.parse(txRequest.data as string) as TransactionRequest[];
+  }, [request]);
+
+  // const tx = useMemo(() => {
+  //   return request?.params?.[0] as TransactionRequest;
+  // }, [request]);
+
+  const submittingStates = {} as { [s: number]: string };
+  transactionRequests.forEach((_, index) => {
+    submittingStates[index] = 'initial';
+  });
+
+  const [transactionStates, setTransactionStates] = useState(submittingStates);
+
   const onAcceptRequest = useCallback(async () => {
     if (!config.tx_requests_enabled) return;
     if (!selectedWallet || !activeSession) return;
     setLoading(true);
-    try {
-      const txRequest = request?.params?.[0] as TransactionRequest;
-      const { type } = await wallet.getWallet(selectedWallet);
 
-      // Change the label while we wait for confirmation
-      if (type === 'HardwareWalletKeychain') {
-        setWaitingForDevice(true);
-      }
-      const activeChainId = chainIdToUse(
-        connectedToHardhat,
-        connectedToHardhatOp,
-        activeSession.chainId,
-      );
-      const txData = {
-        from: selectedWallet,
-        to: txRequest?.to ? getAddress(txRequest?.to) : undefined,
-        value: txRequest.value || '0x0',
-        data: txRequest.data ?? '0x',
-        chainId: activeChainId,
-      };
-      const result = await wallet.sendTransaction(txData);
-      if (result) {
-        const transaction = {
-          asset: asset || undefined,
-          value: result.value.toString(),
-          data: result.data,
-          flashbots: flashbotsEnabledGlobally,
-          from: txData.from,
-          to: txData.to,
-          hash: result.hash as TxHash,
-          chainId: txData.chainId,
-          nonce: result.nonce,
-          status: 'pending',
-          type: 'send',
-          ...selectedGas.transactionGasParams,
-        } satisfies NewTransaction;
+    const submittingStates = {} as { [s: number]: string };
+    transactionRequests.forEach((_, index) => {
+      submittingStates[index] = 'submitting';
+    });
+    setTransactionStates(submittingStates);
 
-        addNewTransaction({
-          address: txData.from as Address,
-          chainId: txData.chainId as ChainId,
-          transaction,
+    // TODO: update this to make sure we wait for the transactions going to the same chain
+    // so that we get the correct nonce
+    const promises = transactionRequests.map(async (txRequest, index) => {
+      try {
+        const { type } = await wallet.getWallet(selectedWallet);
+
+        // Change the label while we wait for confirmation
+        if (type === 'HardwareWalletKeychain') {
+          setWaitingForDevice(true);
+        }
+
+        const txData = {
+          from: selectedWallet,
+          to: txRequest?.to ? getAddress(txRequest?.to) : undefined,
+          value: txRequest.value || '0x0',
+          data: txRequest.data ?? '0x',
+          chainId: txRequest.chainId!,
+        };
+        const result = await wallet.sendTransaction(txData);
+        if (result) {
+          const transaction = {
+            asset: asset || undefined,
+            value: result.value.toString(),
+            data: result.data,
+            flashbots: flashbotsEnabledGlobally,
+            from: txData.from,
+            to: txData.to,
+            hash: result.hash as TxHash,
+            chainId: txData.chainId,
+            nonce: result.nonce,
+            status: 'pending',
+            type: 'send',
+            ...selectedGas.transactionGasParams,
+          } satisfies NewTransaction;
+
+          setTransactionStates({ ...transactionStates, [index]: 'successful' });
+
+          addNewTransaction({
+            address: txData.from as Address,
+            chainId: txData.chainId as ChainId,
+            transaction,
+          });
+          approveRequest(result.hash);
+          setWaitingForDevice(false);
+
+          analytics.track(event.dappPromptSendTransactionApproved, {
+            chainId: txData.chainId,
+            dappURL: dappMetadata?.appHost || '',
+            dappName: dappMetadata?.appName,
+          });
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (e: any) {
+        setTransactionStates({ ...transactionStates, [index]: 'failed' });
+        showLedgerDisconnectedAlertIfNeeded(e);
+        logger.error(
+          new RainbowError('send: error executing send dapp approval'),
+          {
+            message: (e as Error)?.message,
+          },
+        );
+        const extractedError = (e as Error).message.split('[')[0];
+        triggerAlert({
+          text: i18n.t('errors.sending_transaction'),
+          description: extractedError,
         });
-        approveRequest(result.hash);
-        setWaitingForDevice(false);
-
-        analytics.track(event.dappPromptSendTransactionApproved, {
-          chainId: txData.chainId,
-          dappURL: dappMetadata?.appHost || '',
-          dappName: dappMetadata?.appName,
-        });
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      showLedgerDisconnectedAlertIfNeeded(e);
-      logger.error(
-        new RainbowError('send: error executing send dapp approval'),
-        {
-          message: (e as Error)?.message,
-        },
-      );
-      const extractedError = (e as Error).message.split('[')[0];
-      triggerAlert({
-        text: i18n.t('errors.sending_transaction'),
-        description: extractedError,
-      });
-    } finally {
+    });
+
+    await Promise.all(promises).finally(() => {
       setWaitingForDevice(false);
       setLoading(false);
-    }
+    });
   }, [
     selectedWallet,
     activeSession,
-    request?.params,
-    connectedToHardhat,
-    connectedToHardhatOp,
     asset,
     flashbotsEnabledGlobally,
     selectedGas.transactionGasParams,
     approveRequest,
     dappMetadata?.appHost,
     dappMetadata?.appName,
+    transactionRequests,
+    setTransactionStates,
+    transactionStates,
   ]);
 
   const onRejectRequest = useCallback(() => {
@@ -212,7 +239,12 @@ export function SendTransaction({
       flexDirection="column"
       style={{ height: POPUP_DIMENSIONS.height, overflow: 'hidden' }}
     >
-      <SendTransactionInfo request={request} onRejectRequest={rejectRequest} />
+      <SendTransactionInfo
+        dappUrl={request?.meta?.sender?.url || ''}
+        transactionRequests={transactionRequests}
+        transactionStates={transactionStates}
+        onRejectRequest={rejectRequest}
+      />
       <Stack space="20px" padding="20px">
         <Bleed vertical="4px">
           <AccountSigningWith session={activeSession} />
