@@ -24,8 +24,15 @@ export const SendTransactionActions = ({
   loading: boolean;
   dappStatus?: DAppStatus;
 }) => {
-  const { enoughNativeAssetForGas, buttonLabel } =
-    useApproveAppRequestValidations({ session, dappStatus });
+  // const { enoughNativeAssetForGas, buttonLabel } =
+  //   useApproveAppRequestValidations({ session, dappStatus });
+
+  const { buttonLabel } = useApproveAppRequestValidations({
+    session,
+    dappStatus,
+  });
+
+  const enoughNativeAssetForGas = true;
 
   const { trackShortcut } = useKeyboardAnalytics();
   useKeyboardShortcut({

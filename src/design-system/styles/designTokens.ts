@@ -910,6 +910,7 @@ function selectSymbolNames<SymbolName extends readonly SFSymbolName[]>(
 
 // Note: Don't forget to generate the symbols with `yarn ds:generate-symbols`!
 export const symbolNames = selectSymbolNames(
+  'chevron.up',
   'chevron.down',
   'chevron.down.circle',
   'arrow.left',

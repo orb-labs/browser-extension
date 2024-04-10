@@ -10,12 +10,16 @@ import { DappMetadata, useDappMetadata } from '~/core/resources/metadata/dapp';
 import { useCurrentCurrencyStore, useNonceStore } from '~/core/state';
 import { useTestnetModeStore } from '~/core/state/currentSettings/testnetMode';
 import { useSelectedTokenStore } from '~/core/state/selectedToken';
-import { ProviderRequestPayload } from '~/core/transports/providerRequestTransport';
 import { ChainId } from '~/core/types/chains';
-import { getChainName, isTestnetChainId } from '~/core/utils/chains';
+import {
+  findRainbowChainForChainId,
+  getChainName,
+  isTestnetChainId,
+} from '~/core/utils/chains';
 import { copy, copyAddress } from '~/core/utils/copy';
 import { TestnetFaucet } from '~/core/utils/faucets';
 import { formatDate } from '~/core/utils/formatDate';
+import { convertRawAmountToDecimalFormat } from '~/core/utils/numbers';
 import { truncateString } from '~/core/utils/strings';
 import { goToNewTab } from '~/core/utils/tabs';
 import {
@@ -45,8 +49,8 @@ import {
   getDappStatusBadge,
 } from '../DappScanStatus';
 import { SimulationOverview } from '../Simulation';
-import { CopyButton, TabContent, Tabs } from '../Tabs';
-import { useHasEnoughGas } from '../useHasEnoughGas';
+import { CopyButton, TabContent, TransactionInfoTabs } from '../Tabs';
+// import { useHasEnoughGas } from '../useHasEnoughGas';
 import {
   SimulationError,
   TransactionSimulation,
@@ -54,7 +58,9 @@ import {
 } from '../useSimulateTransaction';
 
 interface SendTransactionProps {
-  request: ProviderRequestPayload;
+  transactionRequests: TransactionRequest[];
+  dappUrl: string;
+  transactionStates: { [s: number]: string };
   onRejectRequest: ({
     preventWindowClose,
   }: {
@@ -272,22 +278,145 @@ function TransactionData({
   );
 }
 
+function TransferInfoHeader({
+  customData,
+}: {
+  customData?: Record<string, unknown>;
+}) {
+  const sourceChain = findRainbowChainForChainId(
+    customData?.sourceChainId as number,
+  );
+  const destinationChain = findRainbowChainForChainId(
+    customData?.destinationChainId as number,
+  );
+
+  const token = customData?.token as {
+    address: string;
+    symbol: string;
+    decimals: number;
+  };
+
+  return (
+    <>
+      <Text
+        color="labelTertiary"
+        size="16pt"
+        weight="semibold"
+        whiteSpace="nowrap"
+      >
+        {`Transfer ${convertRawAmountToDecimalFormat(
+          customData?.amount as number,
+          token.decimals,
+        )} ${token.symbol} `}
+      </Text>
+      <Text color="labelTertiary" size="12pt" weight="regular">
+        {`From ${sourceChain?.name} to ${destinationChain?.name}`}
+      </Text>
+    </>
+  );
+}
+
+function ApproveInfoHeader({
+  customData,
+  chainId,
+}: {
+  customData?: Record<string, unknown>;
+  chainId?: number;
+}) {
+  const chain = findRainbowChainForChainId(chainId as number);
+  const token = customData?.token as {
+    address: string;
+    symbol: string;
+    decimals: number;
+  };
+
+  return (
+    <>
+      <Text
+        color="labelTertiary"
+        size="16pt"
+        weight="semibold"
+        whiteSpace="nowrap"
+      >
+        {`Approve ${customData?.spender} to use ${convertRawAmountToDecimalFormat(
+          customData?.amount as number,
+          token.decimals,
+        )} ${token.symbol} `}
+      </Text>
+      <Text color="labelTertiary" size="12pt" weight="regular">
+        {`On ${chain?.name}`}
+      </Text>
+    </>
+  );
+}
+
+function GenericCallInfoHeader({
+  customData,
+}: {
+  customData?: Record<string, unknown>;
+}) {
+  const token = customData?.token as {
+    address: string;
+    symbol: string;
+    decimals: number;
+  };
+
+  return (
+    <>
+      <Text
+        color="labelTertiary"
+        size="16pt"
+        weight="semibold"
+        whiteSpace="nowrap"
+      >
+        {`Transfer ${convertRawAmountToDecimalFormat(
+          customData?.amount as number,
+          token.decimals,
+        )} ${token.symbol} `}
+      </Text>
+      <Text color="labelTertiary" size="12pt" weight="regular">
+        {`To ${customData?.spender}`}
+      </Text>
+    </>
+  );
+}
+
+export function getSymbol(state: string) {
+  switch (state) {
+    case 'initial':
+      return 'circle.fill';
+    case 'submitting':
+      return 'checkmark';
+    case 'successful':
+      return 'checkmark.circle.fill';
+    case 'failed':
+      return 'xmark.circle';
+    default:
+      return 'ellipsis';
+  }
+}
+
 function TransactionInfo({
   request,
   dappUrl,
   dappMetadata,
-  expanded,
-  onExpand,
+  isFirst,
+  isLast,
+  state,
 }: {
   request: TransactionRequest;
   dappUrl: string;
   dappMetadata: DappMetadata | null;
-  expanded: boolean;
-  onExpand: VoidFunction;
+  isFirst: boolean;
+  isLast: boolean;
+  state: string;
 }) {
   const { activeSession } = useAppSession({ host: dappMetadata?.appHost });
-  const chainId = activeSession?.chainId || ChainId.mainnet;
+  const chainId =
+    findRainbowChainForChainId(request?.chainId as number)?.id ||
+    ChainId.mainnet;
 
+  const [expanded, setExpanded] = useState(false);
   const txData = request?.data?.toString() || '';
 
   const {
@@ -310,30 +439,161 @@ function TransactionInfo({
 
   return (
     <>
-      <Tabs
-        tabs={[tabLabel('overview'), tabLabel('details'), tabLabel('data')]}
-        expanded={expanded}
-        onExpand={onExpand}
-      >
-        <TabContent value={tabLabel('overview')}>
-          <Overview
-            chainId={chainId}
-            simulation={simulation}
-            status={status === 'error' && isRefetching ? 'loading' : status}
-            error={error}
-            metadata={dappMetadata}
-          />
-        </TabContent>
-        <TabContent value={tabLabel('details')}>
-          <TransactionDetails
-            session={activeSession!}
-            simulation={simulation}
-          />
-        </TabContent>
-        <TabContent value={tabLabel('data')}>
-          <TransactionData data={txData} expanded={expanded} />
-        </TabContent>
-      </Tabs>
+      <Box display="flex" flexDirection="row">
+        <Box
+          display="flex"
+          flexDirection="column"
+          height="full"
+          justifyContent="flex-start"
+          alignItems="center"
+          paddingRight="16px"
+        >
+          {isFirst ? (
+            <Box
+              display="flex"
+              flexDirection="column"
+              justifyContent="flex-start"
+              style={{ width: '0px', height: '32px' }}
+              background="white"
+            />
+          ) : (
+            <Box
+              display="flex"
+              flexDirection="column"
+              justifyContent="flex-start"
+              style={{ width: '1px', height: '52px' }}
+              background="white"
+            />
+          )}
+
+          <Box display="flex" padding="4px">
+            <Symbol
+              symbol={getSymbol(state)}
+              size={8}
+              color="labelTertiary"
+              weight="semibold"
+            />
+          </Box>
+
+          {!isLast && (
+            <Box
+              display="flex"
+              flexDirection="column"
+              justifyContent="flex-start"
+              style={{ width: '1px', flex: '1' }}
+              background="white"
+            />
+          )}
+        </Box>
+
+        <Box
+          as={motion.div}
+          transition={{
+            layout: {
+              type: 'spring',
+              bounce: 0.2,
+              duration: expanded ? 0.6 : 1,
+            },
+          }}
+          justifyContent="space-between"
+          display="flex"
+          flexDirection="column"
+          padding="20px"
+          background="surfaceSecondaryElevated"
+          borderRadius="20px"
+          borderColor="separatorSecondary"
+          borderWidth="1px"
+          width="full"
+          position="relative"
+          style={{ marginTop: isFirst ? '0px' : '20px' }}
+        >
+          <Box
+            display="flex"
+            flexDirection="row"
+            justifyContent="space-between"
+            position="relative"
+            style={{ height: '36px' }}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            <Box
+              display="flex"
+              flexDirection="column"
+              height="full"
+              justifyContent="space-between"
+            >
+              {request.customData?.type == 'transfer' && (
+                <TransferInfoHeader customData={request.customData} />
+              )}
+              {request.customData?.type == 'approve_er20_token' && (
+                <ApproveInfoHeader
+                  customData={request.customData}
+                  chainId={request.chainId}
+                />
+              )}
+              {request.customData?.type == 'protocol_call' && (
+                <GenericCallInfoHeader customData={request.customData} />
+              )}
+            </Box>
+
+            <Box
+              display="flex"
+              flexDirection="column"
+              height="full"
+              justifyContent="center"
+            >
+              {expanded ? (
+                <Symbol
+                  symbol="chevron.up"
+                  size={12}
+                  color="labelTertiary"
+                  weight="semibold"
+                />
+              ) : (
+                <Symbol
+                  symbol="chevron.down"
+                  size={12}
+                  color="labelTertiary"
+                  weight="semibold"
+                />
+              )}
+            </Box>
+          </Box>
+          {expanded && (
+            <Box display="flex" flexDirection="column" paddingTop="20px">
+              <TransactionInfoTabs
+                tabs={[
+                  tabLabel('overview'),
+                  tabLabel('details'),
+                  tabLabel('data'),
+                ]}
+                expanded={expanded}
+                onExpand={() => setExpanded((e) => !e)}
+              >
+                <TabContent value={tabLabel('overview')}>
+                  <Overview
+                    chainId={chainId}
+                    simulation={simulation}
+                    status={
+                      status === 'error' && isRefetching ? 'loading' : status
+                    }
+                    error={error}
+                    metadata={dappMetadata}
+                  />
+                </TabContent>
+                <TabContent value={tabLabel('details')}>
+                  <TransactionDetails
+                    session={activeSession!}
+                    simulation={simulation}
+                  />
+                </TabContent>
+                <TabContent value={tabLabel('data')}>
+                  <TransactionData data={txData} expanded={expanded} />
+                </TabContent>
+              </TransactionInfoTabs>
+            </Box>
+          )}
+        </Box>
+      </Box>
 
       {!expanded && simulation && simulation.scanning.result !== 'OK' && (
         <MaliciousRequestWarning
@@ -541,26 +801,23 @@ function InsuficientGasFunds({
 }
 
 export function SendTransactionInfo({
-  request,
+  transactionRequests,
+  dappUrl,
+  transactionStates,
   onRejectRequest,
 }: SendTransactionProps) {
-  const dappUrl = request?.meta?.sender?.url || '';
   const { data: dappMetadata } = useDappMetadata({ url: dappUrl });
 
   const { activeSession } = useAppSession({ host: dappMetadata?.appHost });
 
-  const txRequest = request?.params?.[0] as TransactionRequest;
-
-  const [expanded, setExpanded] = useState(false);
-
   const isScamDapp = dappMetadata?.status === DAppStatus.Scam;
 
-  const hasEnoughGas = useHasEnoughGas(activeSession);
+  const hasEnoughGas = true; // useHasEnoughGas(activeSession);
 
   return (
     <Box
       background="surfacePrimaryElevatedSecondary"
-      style={{ minHeight: 397, overflow: 'hidden' }}
+      style={{ minHeight: 397, overflowY: 'scroll' }}
       borderColor="separatorTertiary"
       borderWidth="1px"
       paddingHorizontal="20px"
@@ -573,7 +830,7 @@ export function SendTransactionInfo({
       height="full"
     >
       <AnimatePresence mode="popLayout">
-        {!expanded && (
+        {
           <motion.div
             style={{ paddingTop: 20 }}
             initial={{ opacity: 0, scale: 0.9, y: -8 }}
@@ -600,17 +857,29 @@ export function SendTransactionInfo({
               </Stack>
             </Stack>
           </motion.div>
-        )}
+        }
       </AnimatePresence>
 
       {hasEnoughGas ? (
-        <TransactionInfo
-          request={txRequest}
-          dappMetadata={dappMetadata}
-          dappUrl={dappUrl}
-          expanded={expanded}
-          onExpand={() => setExpanded((e) => !e)}
-        />
+        <Box
+          background="surfacePrimaryElevatedSecondary"
+          display="flex"
+          flexDirection="column"
+          justifyContent="flex-start"
+          gap="0px"
+        >
+          {transactionRequests.map((tx, i) => (
+            <TransactionInfo
+              isFirst={i === 0}
+              state={transactionStates[i]}
+              isLast={i === transactionRequests.length - 1}
+              key={i}
+              request={tx}
+              dappMetadata={dappMetadata}
+              dappUrl={dappUrl}
+            />
+          ))}
+        </Box>
       ) : (
         activeSession && (
           <InsuficientGasFunds
