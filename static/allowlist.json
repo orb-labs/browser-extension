@@ -1,6 +1,14 @@
 {
   "urls": [
+    "ws://chrome-extension",
     "ws://localhost:9090",
+    "https://cryptologos.cc",
+    "https://raw.githubusercontent.com",
+    "https://api-rpc-dev.orblabs.xyz",
+    "http://localhost:4001",
+    "http://localhost:4000",
+    "https://*.core.chainstack.com",
+    "https://cloudflare-eth.com",
     "http://127.0.0.1:*",
     "https://*.g.alchemy.com",
     "wss://refraction.api.p.rainbow.me",
@@ -19,6 +27,7 @@
     "https://burned-solitary-breeze.bsc.quiknode.pro",
     "https://thrumming-shy-lake.bsc-testnet.quiknode.pro",
     "https://o331974.ingest.sentry.io",
+    "https://o4505053359308800.ingest.sentry.io",
     "https://api.segment.io",
     "https://cdn.segment.com",
     "https://rainbow.imgix.net",

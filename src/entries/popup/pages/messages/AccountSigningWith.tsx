@@ -1,15 +1,9 @@
 import { i18n } from '~/core/languages';
-import { ActiveSession } from '~/core/state/appSessions';
 import { ChainId } from '~/core/types/chains';
-import { getChainName } from '~/core/utils/chains';
 import { Inline, Stack, Text } from '~/design-system';
-import { ChainBadge } from '~/entries/popup/components/ChainBadge/ChainBadge';
 import { WalletAvatar } from '~/entries/popup/components/WalletAvatar/WalletAvatar';
 
-import { useNativeAsset } from '../../hooks/useNativeAsset';
-
 import { WalletName } from './BottomActions';
-import { useHasEnoughGas } from './useHasEnoughGas';
 
 export interface SelectedNetwork {
   network: string;
@@ -17,43 +11,42 @@ export interface SelectedNetwork {
   name: string;
 }
 
-function WalletNativeBalance({ session }: { session: ActiveSession }) {
-  const chainId = session?.chainId || ChainId.mainnet;
-  const chainName = getChainName({ chainId });
-  const { nativeAsset } = useNativeAsset({
-    chainId,
-    address: session?.address,
-  });
-  const balance = nativeAsset?.balance;
+// function WalletNativeBalance({ session }: { session: ActiveSession }) {
+//   const chainId = session?.chainId || ChainId.mainnet;
+//   const chainName = getChainName({ chainId });
+//   const { nativeAsset } = useNativeAsset({
+//     chainId,
+//     address: session?.address,
+//   });
+//   const balance = nativeAsset?.balance;
 
-  const hasEnoughGas = useHasEnoughGas(session);
+//   const hasEnoughGas = useHasEnoughGas(session);
 
-  if (!balance) return null;
+//   if (!balance) return null;
 
-  return (
-    <Inline alignVertical="center" space="6px">
-      <ChainBadge chainId={chainId} size={14} />
-      <Text
-        size="12pt"
-        weight="bold"
-        color={hasEnoughGas ? 'labelTertiary' : 'red'}
-      >
-        {+balance.amount > 0
-          ? balance.display
-          : i18n.t('approve_request.no_token', { token: nativeAsset.symbol })}
-      </Text>
-      <Text size="12pt" weight="semibold" color="labelQuaternary">
-        {i18n.t('approve_request.on_chain', {
-          chain: chainName,
-        })}
-      </Text>
-    </Inline>
-  );
-}
+//   return (
+//     <Inline alignVertical="center" space="6px">
+//       <ChainBadge chainId={chainId} size={14} />
+//       <Text
+//         size="12pt"
+//         weight="bold"
+//         color={hasEnoughGas ? 'labelTertiary' : 'red'}
+//       >
+//         {+balance.amount > 0
+//           ? balance.display
+//           : i18n.t('approve_request.no_token', { token: nativeAsset.symbol })}
+//       </Text>
+//       <Text size="12pt" weight="semibold" color="labelQuaternary">
+//         {i18n.t('approve_request.on_chain', {
+//           chain: chainName,
+//         })}
+//       </Text>
+//     </Inline>
+//   );
+// }
 
 export function AccountSigningWith({
   session,
-  noFee,
 }: {
   session: {
     address: `0x${string}`;
@@ -75,13 +68,14 @@ export function AccountSigningWith({
           </Text>
           <WalletName address={address} size="14pt" weight="bold" />
         </Inline>
-        {noFee ? (
+        {/* <WalletNativeBalance session={session} /> */}
+        {/* {noFee ? (
           <Text size="12pt" weight="semibold" color="labelTertiary">
             {i18n.t('approve_request.no_fee_to_sign')}
           </Text>
         ) : (
           <WalletNativeBalance session={session} />
-        )}
+        )} */}
       </Stack>
     </Inline>
   );

@@ -39,15 +39,18 @@ import { isLowerCaseMatch } from './strings';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 export const customChainIdsToAssetNames: Record<ChainId, string> = {
+  42161: 'arbitrum',
   42170: 'arbitrumnova',
   1313161554: 'aurora',
   43114: 'avalanchex',
+  8453: 'base',
   168587773: 'blastsepolia',
   288: 'boba',
   42220: 'celo',
   61: 'classic',
   25: 'cronos',
   2000: 'dogechain',
+  1: 'ethereum',
   250: 'fantom',
   314: 'filecoin',
   1666600000: 'harmony',
@@ -63,7 +66,9 @@ export const customChainIdsToAssetNames: Record<ChainId, string> = {
   1284: 'moonbeam',
   7700: 'nativecanto',
   204: 'opbnb',
+  10: 'optimism',
   11297108109: 'palm',
+  137: 'polygon',
   424: 'pgn',
   1101: 'polygonzkevm',
   369: 'pulsechain',

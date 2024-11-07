@@ -31,6 +31,7 @@ import {
   sendTransaction,
   setVaultPassword,
   signMessage,
+  signTransaction,
   signTypedData,
   unlockVault,
   verifyPassword,
@@ -195,6 +196,28 @@ export const handleWallets = () =>
               payload as TransactionRequest,
               provider,
             );
+            break;
+          }
+          case 'sign_transaction': {
+            console.log('sign_transaction');
+            let provider;
+            if (
+              flashbotsEnabledStore.getState().flashbotsEnabled &&
+              (payload as TransactionRequest).chainId === ChainId.mainnet
+            ) {
+              provider = getFlashbotsProvider();
+            } else {
+              provider = getProvider({
+                chainId: (payload as TransactionRequest).chainId,
+              });
+            }
+
+            console.log('sign_transaction 2');
+            response = await signTransaction(
+              payload as TransactionRequest,
+              provider,
+            );
+            console.log('sign_transaction 3');
             break;
           }
           case 'execute_rap': {

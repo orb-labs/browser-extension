@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect } from 'react';
+import { TransactionRequest } from '@ethersproject/providers';
+import React, { useCallback, useEffect, useMemo } from 'react';
 
 import { initializeMessenger } from '~/core/messengers';
+import { useDappMetadata } from '~/core/resources/metadata/dapp';
 import { usePendingRequestStore } from '~/core/state';
 import { useTestnetModeStore } from '~/core/state/currentSettings/testnetMode';
 import { useNotificationWindowStore } from '~/core/state/notificationWindow';
@@ -9,6 +11,8 @@ import { TESTNET_MODE_BAR_HEIGHT } from '~/core/utils/dimensions';
 import { Box } from '~/design-system';
 
 import { TestnetModeWatcher } from '../../components/TestnetMode/TestnetModeWatcher/TestnetModeWatcher';
+import { useAppSession } from '../../hooks/useAppSession';
+import { useFormulateTransactions } from '../../hooks/useFormulateTransactions';
 import { useRainbowNavigate } from '../../hooks/useRainbowNavigate';
 import { ROUTES } from '../../urls';
 import { isExternalPopup } from '../../utils/windows';
@@ -115,6 +119,29 @@ export const ApproveAppRequest = () => {
     [handleRequestAction, pendingRequest?.id],
   );
 
+  // TODO: move these calls SendTransaction after we communicated to the Rainbow team to fix the infinite rendering issue in the SendTransaction component
+  const { data: dappMetadata } = useDappMetadata({
+    url: pendingRequest?.meta?.sender?.url,
+  });
+  const { activeSession } = useAppSession({ host: dappMetadata?.appHost });
+  const tx: TransactionRequest | undefined = useMemo(() => {
+    if (pendingRequest?.method == 'eth_sendTransaction') {
+      const transactionRequest = pendingRequest
+        ?.params?.[0] as TransactionRequest;
+      return {
+        ...transactionRequest,
+        chainId: Number(activeSession?.chainId),
+      };
+    }
+
+    return undefined;
+  }, [pendingRequest, activeSession]);
+
+  // console.log('tx', tx);
+  const { transactionRequests, isFormulating, operationsId } =
+    useFormulateTransactions(tx);
+  console.log('ApproveAppRequest', transactionRequests, isFormulating);
+
   switch (pendingRequest?.method) {
     case 'wallet_addEthereumChain':
       return (
@@ -178,9 +205,12 @@ export const ApproveAppRequest = () => {
           rejectRequest={rejectRequest}
         >
           <SendTransaction
+            operationsId={operationsId}
             approveRequest={approveRequest}
             rejectRequest={rejectRequest}
             request={pendingRequest}
+            transactionRequests={transactionRequests ?? []}
+            isFormulating={isFormulating}
           />
         </ApproveAppRequestWrapper>
       );

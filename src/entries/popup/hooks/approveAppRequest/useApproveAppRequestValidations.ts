@@ -7,8 +7,6 @@ import { useConnectedToHardhatStore } from '~/core/state/currentSettings/connect
 import { ChainId } from '~/core/types/chains';
 import { chainIdToUse, getChain } from '~/core/utils/chains';
 
-import { useHasEnoughGas } from '../../pages/messages/useHasEnoughGas';
-
 export const useApproveAppRequestValidations = ({
   session,
   dappStatus,
@@ -19,7 +17,7 @@ export const useApproveAppRequestValidations = ({
   const { connectedToHardhat, connectedToHardhatOp } =
     useConnectedToHardhatStore();
 
-  const enoughNativeAssetForGas = useHasEnoughGas(session);
+  const enoughNativeAssetForGas = true; // useHasEnoughGas(session);
 
   const buttonLabel = useMemo(() => {
     const activeChainId = chainIdToUse(

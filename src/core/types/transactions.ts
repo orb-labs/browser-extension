@@ -1,4 +1,12 @@
-import { TransactionResponse } from '@ethersproject/providers';
+import {
+  TransactionRequest,
+  TransactionResponse,
+} from '@ethersproject/providers';
+import {
+  FungibleToken,
+  FungibleTokenAmount,
+  OperationCallType,
+} from '@orbykit/core';
 import { Address } from 'wagmi';
 
 import {
@@ -212,3 +220,17 @@ export type PaginatedTransactionsApiResponse = Omit<
   TransactionApiResponse,
   'fee'
 > & { fee: Omit<TransactionApiResponse['fee'], 'details'> };
+
+export enum OperationStatus {
+  INITIAL = 'initial',
+  SUBMITTING = 'submitting',
+  SUCCESSFUL = 'successful',
+  FAILED = 'failed',
+}
+
+export type OnchainOperation = TransactionRequest & {
+  operation: OperationCallType;
+  fungibleTokenAmounts?: FungibleTokenAmount<FungibleToken>[];
+  status: OperationStatus;
+  transactionId?: string;
+};

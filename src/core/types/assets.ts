@@ -10,8 +10,8 @@ export type AddressOrEth = Address | typeof ETH_ADDRESS;
 
 export interface ParsedAsset {
   address: AddressOrEth;
-  chainId: ChainId;
-  chainName: ChainName;
+  chainId?: ChainId;
+  chainName?: ChainName;
   colors?: {
     primary?: string;
     fallback?: string;
@@ -19,7 +19,7 @@ export interface ParsedAsset {
   };
   isNativeAsset: boolean;
   name: string;
-  native: {
+  native?: {
     price?: {
       change: string;
       amount: number;
@@ -30,7 +30,7 @@ export interface ParsedAsset {
   price?: ZerionAssetPrice;
   symbol: string;
   uniqueId: UniqueId;
-  decimals: number;
+  decimals?: number;
   icon_url?: string;
   type?: AssetType;
   smallBalance?: boolean;
@@ -43,12 +43,13 @@ export interface ParsedAsset {
 }
 
 export interface ParsedUserAsset extends ParsedAsset {
+  parentId?: string;
   balance: {
     amount: string;
     display: string;
   };
-  native: {
-    balance: {
+  native?: {
+    balance?: {
       amount: string;
       display: string;
     };

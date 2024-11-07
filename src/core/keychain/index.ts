@@ -247,6 +247,28 @@ export const sendTransaction = async (
   return response;
 };
 
+export const signTransaction = async (
+  txPayload: TransactionRequest,
+  provider: Provider,
+): Promise<{ signedTx: string; raw: TransactionRequest }> => {
+  console.log('signTransaction 1', txPayload);
+  if (typeof txPayload.from === 'undefined') {
+    throw new Error('Missing from address');
+  }
+
+  console.log('signTransaction 2');
+
+  const signer = await keychainManager.getSigner(txPayload.from as Address);
+  console.log('signTransaction 3');
+  const wallet = signer.connect(provider);
+  console.log('signTransaction 4');
+  const tx = await wallet.populateTransaction(txPayload);
+  console.log('signTransaction 5');
+  const signedTx = await wallet.signTransaction(tx);
+  console.log('KEYCHAIN SIGN RESPONSE', signedTx);
+  return { signedTx, raw: tx };
+};
+
 export const executeRap = async ({
   rapActionParameters,
   type,

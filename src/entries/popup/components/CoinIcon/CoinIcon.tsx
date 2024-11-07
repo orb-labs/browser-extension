@@ -1,3 +1,4 @@
+import { AddressZero } from '@ethersproject/constants';
 import { upperCase } from 'lodash';
 import React, { ReactNode } from 'react';
 
@@ -12,6 +13,7 @@ import {
 import { ChainId } from '~/core/types/chains';
 import { UniqueAsset } from '~/core/types/nfts';
 import { SearchAsset } from '~/core/types/search';
+import { getCustomChainIconUrl } from '~/core/utils/assets';
 import { AccentColorProvider, Box, Symbol } from '~/design-system';
 import { BoxStyles } from '~/design-system/styles/core.css';
 import { colors as emojiColors } from '~/entries/popup/utils/emojiAvatarBackgroundColors';
@@ -54,7 +56,7 @@ export function CoinIcon({
 }) {
   const mainnetAddress = asset?.mainnetAddress;
   const address = asset?.address;
-  const chain = asset?.chainId || ChainId.mainnet;
+  const chain = asset?.chainId;
   const shadowColor = asset?.colors?.primary || '#808088';
   const isNft =
     (asset as ParsedAsset)?.standard === 'erc-721' ||
@@ -68,7 +70,7 @@ export function CoinIcon({
       badgeSize={badgeSize}
       size={size}
       shadowColor={shadowColor}
-      chainId={chain}
+      chainId={chain || ChainId.mainnet}
       borderRadius={isNft ? nftRadiusBySize[size === 20 ? 20 : 36] : undefined}
     >
       <CloudinaryCoinIcon
@@ -76,6 +78,7 @@ export function CoinIcon({
         fallbackText={asset?.symbol || fallbackText}
         mainnetAddress={mainnetAddress}
         url={asset?.icon_url}
+        chainId={chain}
         size={size}
       />
     </CoinIconWrapper>
@@ -123,14 +126,9 @@ function ShadowWrapper({
 }
 
 function CoinIconWrapper({
-  chainId,
   children,
   shadowColor,
   size,
-  badge = true,
-  badgePositionBottom,
-  badgePositionLeft,
-  badgeSize,
   borderRadius,
 }: {
   chainId: ChainId;
@@ -152,17 +150,6 @@ function CoinIconWrapper({
       >
         {children}
       </ShadowWrapper>
-      {badge && chainId !== ChainId.mainnet && (
-        <Box
-          display="flex"
-          height="fit"
-          position="absolute"
-          style={{ bottom: badgePositionBottom, left: badgePositionLeft }}
-          width="fit"
-        >
-          <ChainBadge chainId={chainId} shadow size={badgeSize} />
-        </Box>
-      )}
     </Box>
   );
 }
@@ -180,18 +167,22 @@ function CloudinaryCoinIcon({
   mainnetAddress,
   size = 36,
   url,
+  chainId,
 }: {
   address?: AddressOrEth;
   fallbackText?: string;
   mainnetAddress?: AddressOrEth;
   size: number;
   url?: string;
+  chainId?: ChainId;
 }) {
   let src = url;
   const eth = ETH_ADDRESS;
 
   if (address === eth || mainnetAddress === eth) {
     src = EthIcon;
+  } else if (chainId) {
+    src = getCustomChainIconUrl(chainId, AddressZero);
   }
 
   const formattedSymbol = fallbackText ? formatSymbol(fallbackText, size) : '';
@@ -401,7 +392,7 @@ export function TwoCoinsIcon({
       </Box>
       <Box position="absolute" bottom="0" style={{ zIndex: 2, left: '-6px' }}>
         {badge && chainId !== ChainId.mainnet && (
-          <ChainBadge chainId={chainId} shadow size="16" />
+          <ChainBadge chainId={chainId || ChainId.mainnet} shadow size="16" />
         )}
       </Box>
     </Box>

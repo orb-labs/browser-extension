@@ -1,4 +1,4 @@
-import { TransactionRequest } from '@ethersproject/abstract-provider';
+import { OperationCallType } from '@orbykit/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ReactNode, useState } from 'react';
 import { Address } from 'wagmi';
@@ -10,12 +10,17 @@ import { DappMetadata, useDappMetadata } from '~/core/resources/metadata/dapp';
 import { useCurrentCurrencyStore, useNonceStore } from '~/core/state';
 import { useTestnetModeStore } from '~/core/state/currentSettings/testnetMode';
 import { useSelectedTokenStore } from '~/core/state/selectedToken';
-import { ProviderRequestPayload } from '~/core/transports/providerRequestTransport';
 import { ChainId } from '~/core/types/chains';
-import { getChainName, isTestnetChainId } from '~/core/utils/chains';
+import { OnchainOperation, OperationStatus } from '~/core/types/transactions';
+import {
+  findRainbowChainForChainId,
+  getChainName,
+  isTestnetChainId,
+} from '~/core/utils/chains';
 import { copy, copyAddress } from '~/core/utils/copy';
 import { TestnetFaucet } from '~/core/utils/faucets';
 import { formatDate } from '~/core/utils/formatDate';
+import { convertRawAmountToDecimalFormat } from '~/core/utils/numbers';
 import { truncateString } from '~/core/utils/strings';
 import { goToNewTab } from '~/core/utils/tabs';
 import {
@@ -45,8 +50,8 @@ import {
   getDappStatusBadge,
 } from '../DappScanStatus';
 import { SimulationOverview } from '../Simulation';
-import { CopyButton, TabContent, Tabs } from '../Tabs';
-import { useHasEnoughGas } from '../useHasEnoughGas';
+import { CopyButton, TabContent, TransactionInfoTabs } from '../Tabs';
+// import { useHasEnoughGas } from '../useHasEnoughGas';
 import {
   SimulationError,
   TransactionSimulation,
@@ -54,7 +59,8 @@ import {
 } from '../useSimulateTransaction';
 
 interface SendTransactionProps {
-  request: ProviderRequestPayload;
+  transactionRequests: OnchainOperation[];
+  dappUrl: string;
   onRejectRequest: ({
     preventWindowClose,
   }: {
@@ -272,22 +278,196 @@ function TransactionData({
   );
 }
 
+function TransferInfoHeader({
+  onchainOperation,
+  finalTransactionChainId,
+}: {
+  onchainOperation: OnchainOperation;
+  finalTransactionChainId?: number;
+}) {
+  // TODO: support multiple tokens and other token types
+  const fungibleTokenAmount = onchainOperation.fungibleTokenAmounts?.[0];
+
+  const sourceChain = findRainbowChainForChainId(
+    fungibleTokenAmount?.fungibleToken?.chainId as number,
+  );
+  const destinationChain = finalTransactionChainId
+    ? findRainbowChainForChainId(finalTransactionChainId)
+    : undefined;
+
+  return (
+    <>
+      {fungibleTokenAmount && (
+        <>
+          <Text color="label" size="16pt" weight="semibold" whiteSpace="nowrap">
+            {`Transfer ${convertRawAmountToDecimalFormat(
+              Number(fungibleTokenAmount?.toRawAmount()),
+              fungibleTokenAmount.fungibleToken.decimals,
+              4,
+            )}} ${fungibleTokenAmount.fungibleToken.symbol}`}
+          </Text>
+        </>
+      )}
+      <Text color="labelTertiary" size="12pt" weight="regular">
+        {`From ${sourceChain?.name} to ${destinationChain?.name}`}
+      </Text>
+    </>
+  );
+}
+
+function ApproveInfoHeader({
+  onchainOperation,
+}: {
+  onchainOperation: OnchainOperation;
+}) {
+  // TODO: support multiple tokens and other token types
+  const fungibleTokenAmount = onchainOperation.fungibleTokenAmounts?.[0];
+
+  const chain = findRainbowChainForChainId(
+    fungibleTokenAmount?.fungibleToken.chainId as number,
+  );
+
+  return (
+    <>
+      {fungibleTokenAmount && (
+        <>
+          <Text color="label" size="16pt" weight="semibold" whiteSpace="nowrap">
+            {`Approve ${convertRawAmountToDecimalFormat(
+              Number(fungibleTokenAmount?.toRawAmount()),
+              fungibleTokenAmount.fungibleToken.decimals,
+              4,
+            )}} ${fungibleTokenAmount.fungibleToken.symbol} `}
+          </Text>
+        </>
+      )}
+      <Text color="labelTertiary" size="12pt" weight="regular">
+        {`On ${chain?.name}`}
+      </Text>
+    </>
+  );
+}
+
+function GenericCallInfoHeader({
+  onchainOperation,
+  finalOperation,
+}: {
+  onchainOperation: OnchainOperation;
+  dappMetadata: DappMetadata | null;
+  finalOperation: OnchainOperation;
+}) {
+  // TODO: support multiple tokens and other token types
+  const fungibleTokenAmount = onchainOperation.fungibleTokenAmounts?.[0];
+
+  return (
+    <>
+      {fungibleTokenAmount && (
+        <>
+          <Text color="label" size="16pt" weight="semibold" whiteSpace="nowrap">
+            {`${convertRawAmountToDecimalFormat(
+              Number(fungibleTokenAmount?.toRawAmount()),
+              fungibleTokenAmount.fungibleToken.decimals,
+              4,
+            )} ${fungibleTokenAmount.fungibleToken.symbol} `}
+          </Text>
+        </>
+      )}
+
+      <Text color="labelTertiary" size="14pt" weight="regular">
+        {`From ${findRainbowChainForChainId(onchainOperation.chainId as number)
+          ?.name} to ${findRainbowChainForChainId(
+          finalOperation.chainId as number,
+        )?.name}`}
+      </Text>
+    </>
+  );
+}
+
+function FinalCallInfoHeader({
+  onchainOperation,
+  dappMetadata,
+}: {
+  onchainOperation: OnchainOperation;
+  dappMetadata: DappMetadata | null;
+}) {
+  // TODO: support multiple tokens and other token types
+  const name = dappMetadata?.appName || onchainOperation.to;
+  // TODO: support multiple tokens and other token types
+  const fungibleTokenAmount = onchainOperation.fungibleTokenAmounts?.[0];
+
+  return (
+    <>
+      {fungibleTokenAmount && (
+        <>
+          <Text color="label" size="16pt" weight="semibold" whiteSpace="nowrap">
+            {`Using ${convertRawAmountToDecimalFormat(
+              Number(fungibleTokenAmount?.toRawAmount()),
+              fungibleTokenAmount.fungibleToken.decimals,
+              4,
+            )} ${fungibleTokenAmount.fungibleToken.symbol} `}
+          </Text>
+        </>
+      )}
+
+      <Text color="labelTertiary" size="14pt" weight="regular">
+        {`${name} on ${findRainbowChainForChainId(
+          onchainOperation.chainId as number,
+        )?.name}`}
+      </Text>
+    </>
+  );
+}
+
+export function getSymbol(state: OperationStatus) {
+  switch (state) {
+    case OperationStatus.INITIAL:
+      return 'circle';
+    case OperationStatus.SUBMITTING:
+      return 'clock';
+    case OperationStatus.SUCCESSFUL:
+      return 'checkmark.circle.fill';
+    case OperationStatus.FAILED:
+      return 'xmark.circle';
+    default:
+      return 'circle';
+  }
+}
+
+export function getSymbolColor(state: OperationStatus) {
+  switch (state) {
+    case OperationStatus.INITIAL:
+      return 'labelTertiary';
+    case OperationStatus.SUBMITTING:
+      return 'yellow';
+    case OperationStatus.SUCCESSFUL:
+      return 'green';
+    case OperationStatus.FAILED:
+      return 'red';
+    default:
+      return 'labelTertiary';
+  }
+}
+
 function TransactionInfo({
   request,
   dappUrl,
   dappMetadata,
-  expanded,
-  onExpand,
+  isFirst,
+  isLast,
+  finalTransactionRequest,
 }: {
-  request: TransactionRequest;
+  request: OnchainOperation;
   dappUrl: string;
   dappMetadata: DappMetadata | null;
-  expanded: boolean;
-  onExpand: VoidFunction;
+  isFirst: boolean;
+  isLast: boolean;
+  finalTransactionRequest: OnchainOperation;
 }) {
   const { activeSession } = useAppSession({ host: dappMetadata?.appHost });
-  const chainId = activeSession?.chainId || ChainId.mainnet;
+  const chainId =
+    findRainbowChainForChainId(request?.chainId as number)?.id ||
+    ChainId.mainnet;
 
+  const [expanded, setExpanded] = useState(false);
   const txData = request?.data?.toString() || '';
 
   const {
@@ -310,30 +490,173 @@ function TransactionInfo({
 
   return (
     <>
-      <Tabs
-        tabs={[tabLabel('overview'), tabLabel('details'), tabLabel('data')]}
-        expanded={expanded}
-        onExpand={onExpand}
-      >
-        <TabContent value={tabLabel('overview')}>
-          <Overview
-            chainId={chainId}
-            simulation={simulation}
-            status={status === 'error' && isRefetching ? 'loading' : status}
-            error={error}
-            metadata={dappMetadata}
-          />
-        </TabContent>
-        <TabContent value={tabLabel('details')}>
-          <TransactionDetails
-            session={activeSession!}
-            simulation={simulation}
-          />
-        </TabContent>
-        <TabContent value={tabLabel('data')}>
-          <TransactionData data={txData} expanded={expanded} />
-        </TabContent>
-      </Tabs>
+      <Box display="flex" flexDirection="row">
+        {!(isFirst && isLast) && (
+          <Box
+            display="flex"
+            flexDirection="column"
+            height="full"
+            justifyContent="flex-start"
+            alignItems="center"
+            paddingRight="16px"
+          >
+            {isFirst ? (
+              <Box
+                display="flex"
+                flexDirection="column"
+                justifyContent="flex-start"
+                style={{ width: '0px', height: '32px' }}
+                background="white"
+              />
+            ) : (
+              <Box
+                display="flex"
+                flexDirection="column"
+                justifyContent="flex-start"
+                style={{ width: '1px', height: '52px' }}
+                background="white"
+              />
+            )}
+
+            <Box display="flex" paddingVertical="4px">
+              <Symbol
+                symbol={getSymbol(request.status)}
+                size={12}
+                color={getSymbolColor(request.status)}
+                weight="semibold"
+              />
+            </Box>
+
+            {!isLast && (
+              <Box
+                display="flex"
+                flexDirection="column"
+                justifyContent="flex-start"
+                style={{ width: '1px', flex: '1' }}
+                background="white"
+              />
+            )}
+          </Box>
+        )}
+
+        <Box
+          as={motion.div}
+          transition={{
+            layout: {
+              type: 'spring',
+              bounce: 0.2,
+              duration: expanded ? 0.6 : 1,
+            },
+          }}
+          justifyContent="space-between"
+          display="flex"
+          flexDirection="column"
+          padding="20px"
+          background="surfaceSecondaryElevated"
+          borderRadius="20px"
+          borderColor="separatorSecondary"
+          borderWidth="1px"
+          width="full"
+          position="relative"
+          style={{ marginTop: isFirst ? '0px' : '20px' }}
+        >
+          <Box
+            display="flex"
+            flexDirection="row"
+            justifyContent="space-between"
+            position="relative"
+            style={{ height: '36px' }}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            <Box
+              display="flex"
+              flexDirection="column"
+              height="full"
+              justifyContent="space-between"
+            >
+              {request.operation == OperationCallType.NATIVE_TOKEN_TRANSFER && (
+                <TransferInfoHeader
+                  onchainOperation={request}
+                  finalTransactionChainId={finalTransactionRequest.chainId}
+                />
+              )}
+              {request.operation == OperationCallType.APPROVE_ER20_TOKEN && (
+                <ApproveInfoHeader onchainOperation={request} />
+              )}
+              {request.operation == OperationCallType.SUBMIT_INTENT && (
+                <GenericCallInfoHeader
+                  onchainOperation={request}
+                  dappMetadata={dappMetadata}
+                  finalOperation={finalTransactionRequest}
+                />
+              )}
+              {request.operation == OperationCallType.FINAL_TRANSACTION && (
+                <FinalCallInfoHeader
+                  onchainOperation={request}
+                  dappMetadata={dappMetadata}
+                />
+              )}
+            </Box>
+
+            <Box
+              display="flex"
+              flexDirection="column"
+              height="full"
+              justifyContent="center"
+            >
+              {expanded ? (
+                <Symbol
+                  symbol="chevron.up"
+                  size={12}
+                  color="labelTertiary"
+                  weight="semibold"
+                />
+              ) : (
+                <Symbol
+                  symbol="chevron.down"
+                  size={12}
+                  color="labelTertiary"
+                  weight="semibold"
+                />
+              )}
+            </Box>
+          </Box>
+          {expanded && (
+            <Box display="flex" flexDirection="column" paddingTop="20px">
+              <TransactionInfoTabs
+                tabs={[
+                  tabLabel('overview'),
+                  tabLabel('details'),
+                  tabLabel('data'),
+                ]}
+                expanded={expanded}
+                onExpand={() => setExpanded((e) => !e)}
+              >
+                <TabContent value={tabLabel('overview')}>
+                  <Overview
+                    chainId={chainId}
+                    simulation={simulation}
+                    status={
+                      status === 'error' && isRefetching ? 'loading' : status
+                    }
+                    error={error}
+                    metadata={dappMetadata}
+                  />
+                </TabContent>
+                <TabContent value={tabLabel('details')}>
+                  <TransactionDetails
+                    session={activeSession!}
+                    simulation={simulation}
+                  />
+                </TabContent>
+                <TabContent value={tabLabel('data')}>
+                  <TransactionData data={txData} expanded={expanded} />
+                </TabContent>
+              </TransactionInfoTabs>
+            </Box>
+          )}
+        </Box>
+      </Box>
 
       {!expanded && simulation && simulation.scanning.result !== 'OK' && (
         <MaliciousRequestWarning
@@ -541,26 +864,20 @@ function InsuficientGasFunds({
 }
 
 export function SendTransactionInfo({
-  request,
+  transactionRequests,
+  dappUrl,
   onRejectRequest,
 }: SendTransactionProps) {
-  const dappUrl = request?.meta?.sender?.url || '';
   const { data: dappMetadata } = useDappMetadata({ url: dappUrl });
-
   const { activeSession } = useAppSession({ host: dappMetadata?.appHost });
-
-  const txRequest = request?.params?.[0] as TransactionRequest;
-
-  const [expanded, setExpanded] = useState(false);
-
   const isScamDapp = dappMetadata?.status === DAppStatus.Scam;
-
-  const hasEnoughGas = useHasEnoughGas(activeSession);
+  const finalTransaction = transactionRequests[transactionRequests.length - 1];
+  const hasEnoughGas = true; // useHasEnoughGas(activeSession);
 
   return (
     <Box
       background="surfacePrimaryElevatedSecondary"
-      style={{ minHeight: 397, overflow: 'hidden' }}
+      style={{ minHeight: 397, overflowY: 'scroll' }}
       borderColor="separatorTertiary"
       borderWidth="1px"
       paddingHorizontal="20px"
@@ -573,7 +890,7 @@ export function SendTransactionInfo({
       height="full"
     >
       <AnimatePresence mode="popLayout">
-        {!expanded && (
+        {
           <motion.div
             style={{ paddingTop: 20 }}
             initial={{ opacity: 0, scale: 0.9, y: -8 }}
@@ -600,17 +917,29 @@ export function SendTransactionInfo({
               </Stack>
             </Stack>
           </motion.div>
-        )}
+        }
       </AnimatePresence>
 
       {hasEnoughGas ? (
-        <TransactionInfo
-          request={txRequest}
-          dappMetadata={dappMetadata}
-          dappUrl={dappUrl}
-          expanded={expanded}
-          onExpand={() => setExpanded((e) => !e)}
-        />
+        <Box
+          background="surfacePrimaryElevatedSecondary"
+          display="flex"
+          flexDirection="column"
+          justifyContent="flex-start"
+          gap="0px"
+        >
+          {transactionRequests.map((tx, i) => (
+            <TransactionInfo
+              isFirst={i === 0}
+              isLast={i === transactionRequests.length - 1}
+              key={i}
+              request={tx}
+              dappMetadata={dappMetadata}
+              dappUrl={dappUrl}
+              finalTransactionRequest={finalTransaction}
+            />
+          ))}
+        </Box>
       ) : (
         activeSession && (
           <InsuficientGasFunds

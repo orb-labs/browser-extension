@@ -19,10 +19,6 @@ import {
 } from '~/core/raps/references';
 import { gasStore } from '~/core/state';
 import { SessionStorage } from '~/core/storage';
-import {
-  TransactionGasParams,
-  TransactionLegacyGasParams,
-} from '~/core/types/gas';
 import { KeychainWallet } from '~/core/types/keychainTypes';
 import { ExecuteRapResponse } from '~/core/types/transactions';
 import { hasPreviousTransactions } from '~/core/utils/ethereum';
@@ -93,10 +89,46 @@ export const signTransactionFromHW = async (
   }
 };
 
-export const sendTransaction = async (
+export const GAS: {
+  [s: number]: {
+    gasPrice: bigint;
+    maxFeePerGas: bigint;
+    maxPriorityFeePerGas: bigint;
+  };
+} = {
+  [137]: {
+    // gasPrice: 30000000025n,
+    // maxFeePerGas: 30000000024n,
+    // maxPriorityFeePerGas: 30000000000n
+    gasPrice: 30000000025n,
+    maxFeePerGas: 30000000024n,
+    maxPriorityFeePerGas: 30000000000n,
+  },
+  [42161]: {
+    gasPrice: 10000000n,
+    maxFeePerGas: 20000000n,
+    maxPriorityFeePerGas: 0n,
+  }, // arbitrum
+  [10]: {
+    gasPrice: 61164183n,
+    maxFeePerGas: 121328366n,
+    maxPriorityFeePerGas: 1000000n,
+  }, // optimism
+  [8453]: {
+    gasPrice: 129192366n,
+    maxFeePerGas: 257384732n,
+    maxPriorityFeePerGas: 1000000n,
+  }, // base
+};
+
+export const signOrSendTransaction = async (
   transactionRequest: TransactionRequest,
-): Promise<TransactionResponse> => {
+  walletActionType: 'sign_transaction' | 'send_transaction',
+): Promise<
+  TransactionResponse | { signedTx: string; raw: TransactionRequest }
+> => {
   const { selectedGas } = gasStore.getState();
+
   const provider = getProvider({
     chainId: transactionRequest.chainId,
   });
@@ -112,17 +144,20 @@ export const sendTransaction = async (
       chainId: transactionRequest.chainId as number,
     }));
 
+  const maxPriorityFeePerGas = GAS[transactionRequest.chainId as number];
   const transactionGasParams = {
     maxFeePerGas:
-      transactionRequest.maxFeePerGas ||
-      (selectedGas.transactionGasParams as TransactionGasParams).maxFeePerGas,
+      // transactionRequest.maxFeePerGas ||
+      maxPriorityFeePerGas.maxFeePerGas,
     maxPriorityFeePerGas:
-      transactionRequest.maxPriorityFeePerGas ||
-      (selectedGas.transactionGasParams as TransactionGasParams)
-        .maxPriorityFeePerGas,
+      // transactionRequest.maxPriorityFeePerGas ||
+      maxPriorityFeePerGas.maxPriorityFeePerGas,
+    // undefined,
     gasPrice:
-      transactionRequest.gasPrice ||
-      (selectedGas.transactionGasParams as TransactionLegacyGasParams).gasPrice,
+      // transactionRequest.gasPrice ||
+      transactionRequest.chainId == 137
+        ? maxPriorityFeePerGas.gasPrice
+        : undefined,
   };
 
   const params = {
@@ -132,6 +167,18 @@ export const sendTransaction = async (
     value: transactionRequest?.value,
     nonce,
   };
+
+  console.log(
+    'signOrSendTransaction',
+    'maxPriorityFeePerGas',
+    maxPriorityFeePerGas,
+    'selectedGas',
+    selectedGas,
+    'transactionGasParams',
+    transactionGasParams,
+    'params',
+    params,
+  );
 
   let walletInfo;
   try {
@@ -157,10 +204,18 @@ export const sendTransaction = async (
         throw new Error('Unsupported hardware wallet');
     }
   } else {
-    return walletAction(
-      'send_transaction',
-      params,
-    ) as unknown as TransactionResponse;
+    if (walletActionType === 'send_transaction') {
+      return walletAction(
+        walletActionType,
+        params,
+      ) as unknown as TransactionResponse;
+    } else {
+      console.log('signOrSendTransaction 5', transactionRequest.chainId);
+      return walletAction(walletActionType, params) as unknown as {
+        signedTx: string;
+        raw: TransactionRequest;
+      };
+    }
   }
 };
 

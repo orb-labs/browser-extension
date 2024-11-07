@@ -459,8 +459,11 @@ export const convertAmountToNativeDisplayWithThreshold = (
 export const convertRawAmountToDecimalFormat = (
   value: BigNumberish,
   decimals = 18,
+  fixed = 2,
 ): string =>
-  new BigNumber(value).dividedBy(new BigNumber(10).pow(decimals)).toFixed();
+  new BigNumber(value)
+    .dividedBy(new BigNumber(10).pow(decimals))
+    .toFixed(fixed);
 
 /**
  * @desc convert from decimal format to raw amount

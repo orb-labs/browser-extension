@@ -2,18 +2,15 @@ import { useMemo } from 'react';
 import { useBalance } from 'wagmi';
 
 import { i18n } from '~/core/languages';
-import { supportedCurrencies } from '~/core/references';
 import { getNftCount } from '~/core/resources/nfts/nfts';
-import { useCurrentAddressStore, useCurrentCurrencyStore } from '~/core/state';
-import { useHideAssetBalancesStore } from '~/core/state/currentSettings/hideAssetBalances';
+import { useCurrentAddressStore } from '~/core/state';
 import { useTestnetModeStore } from '~/core/state/currentSettings/testnetMode';
 import { Box, Inline, Inset, Text } from '~/design-system';
 import { Skeleton } from '~/design-system/components/Skeleton/Skeleton';
 
-import { Asterisks } from '../../components/Asterisks/Asterisks';
 import { Tab } from '../../components/Tabs/TabBar';
 import { CursorTooltip } from '../../components/Tooltip/CursorTooltip';
-import { useUserAssetsBalance } from '../../hooks/useUserAssetsBalance';
+import { useBalances } from '../../hooks/useBalances';
 import { useUserChains } from '../../hooks/useUserChains';
 import { useVisibleTokenCount } from '../../hooks/useVisibleTokenCount';
 
@@ -27,10 +24,11 @@ export function TabHeader({
   onSelectTab: (tab: Tab) => void;
 }) {
   const { currentAddress: address } = useCurrentAddressStore();
-  const { hideAssetBalances } = useHideAssetBalancesStore();
-  const { data: balance, isLoading } = useBalance({ address });
-  const { display: userAssetsBalanceDisplay } = useUserAssetsBalance();
-  const { currentCurrency } = useCurrentCurrencyStore();
+  // const { hideAssetBalances } = useHideAssetBalancesStore();
+  const { isLoading } = useBalance({ address });
+  // const { display: userAssetsBalanceDisplay } = useUserAssetsBalance();
+  const { fiatTotal: userAssetsBalanceDisplay } = useBalances(address);
+  // const { currentCurrency } = useCurrentCurrencyStore();
   const { visibleTokenCount } = useVisibleTokenCount();
   const { testnetMode } = useTestnetModeStore();
   const { chains: userChains } = useUserChains();
@@ -41,32 +39,33 @@ export function TabHeader({
   });
 
   const displayBalanceComponent = useMemo(
-    () =>
-      hideAssetBalances ? (
-        <Inline alignHorizontal="right" alignVertical="center">
-          <Text
-            testId={'balance-hidden'}
-            color={activeTab === 'tokens' ? 'label' : 'labelTertiary'}
-            size="16pt"
-            weight="bold"
-          >
-            {supportedCurrencies?.[currentCurrency]?.symbol}
-          </Text>
-          <Asterisks color="label" size={13} />
-        </Inline>
-      ) : (
-        <Text
-          testId={'balance-shown'}
-          color={activeTab === 'tokens' ? 'label' : 'labelTertiary'}
-          size="16pt"
-          weight="bold"
-          userSelect="all"
-          cursor="text"
-        >
-          {userAssetsBalanceDisplay}
-        </Text>
-      ),
-    [activeTab, currentCurrency, hideAssetBalances, userAssetsBalanceDisplay],
+    () => (
+      // hideAssetBalances ? (
+      //   <Inline alignHorizontal="right" alignVertical="center">
+      //     <Text
+      //       testId={'balance-hidden'}
+      //       color={activeTab === 'tokens' ? 'label' : 'labelTertiary'}
+      //       size="16pt"
+      //       weight="bold"
+      //     >
+      //       {supportedCurrencies?.[currentCurrency]?.symbol}
+      //     </Text>
+      //     <Asterisks color="label" size={13} />
+      //   </Inline>
+      // ) : (
+      <Text
+        testId={'balance-shown'}
+        color={activeTab === 'tokens' ? 'label' : 'labelTertiary'}
+        size="16pt"
+        weight="bold"
+        userSelect="all"
+        cursor="text"
+      >
+        {userAssetsBalanceDisplay}
+      </Text>
+    ),
+    // ),
+    [activeTab, userAssetsBalanceDisplay],
   );
 
   return (
@@ -108,18 +107,18 @@ export function TabHeader({
           </Inline>
         )}
 
-        {activeTab !== 'nfts' && balance && (
-          <CursorTooltip
-            align="end"
-            arrowAlignment="right"
-            text={i18n.t('tooltip.balance')}
-            textWeight="bold"
-            textSize="12pt"
-            textColor="labelSecondary"
-          >
-            <Inline alignVertical="center">{displayBalanceComponent}</Inline>
-          </CursorTooltip>
-        )}
+        {/* {activeTab !== 'nfts' && balance && ( */}
+        <CursorTooltip
+          align="end"
+          arrowAlignment="right"
+          text={i18n.t('tooltip.balance')}
+          textWeight="bold"
+          textSize="12pt"
+          textColor="labelSecondary"
+        >
+          <Inline alignVertical="center">{displayBalanceComponent}</Inline>
+        </CursorTooltip>
+        {/* )} */}
         {activeTab === 'nfts' && (
           <Inline alignVertical="center" space="8px">
             <DisplayModeDropdown />

@@ -129,8 +129,15 @@ export const maybeSignUri = (
   // Just in case we try to load a local image
   if (!externalImageUri?.startsWith('https://')) {
     return externalImageUri;
-  }
-  if (externalImageUri?.startsWith('https://icons.duckduckgo.com/')) {
+  } else if (externalImageUri?.startsWith('https://icons.duckduckgo.com/')) {
+    return externalImageUri;
+  } else if (
+    externalImageUri?.startsWith('https://raw.githubusercontent.com')
+  ) {
+    return externalImageUri;
+  } else if (externalImageUri?.startsWith('https://cryptologos.cc')) {
+    return externalImageUri;
+  } else if (externalImageUri?.startsWith('https://assets.coingecko.com')) {
     return externalImageUri;
   }
 

@@ -1,29 +1,22 @@
 /* eslint-disable no-nested-ternary */
+import { AddressZero } from '@ethersproject/constants';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'framer-motion';
-import uniqBy from 'lodash/uniqBy';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Address } from 'wagmi';
 
 import { i18n } from '~/core/languages';
 import { supportedCurrencies } from '~/core/references';
 import { shortcuts } from '~/core/references/shortcuts';
-import { selectUserAssetsList } from '~/core/resources/_selectors';
-import {
-  selectUserAssetsFilteringSmallBalancesList,
-  selectorFilterByUserChains,
-} from '~/core/resources/_selectors/assets';
-import { useUserAssets } from '~/core/resources/assets';
-import { useCustomNetworkAssets } from '~/core/resources/assets/customNetworkAssets';
 import { fetchProviderWidgetUrl } from '~/core/resources/f2c';
 import { FiatProviderName } from '~/core/resources/f2c/types';
 import { useCurrentAddressStore, useCurrentCurrencyStore } from '~/core/state';
 import { useCurrentThemeStore } from '~/core/state/currentSettings/currentTheme';
 import { useHideAssetBalancesStore } from '~/core/state/currentSettings/hideAssetBalances';
-import { useHideSmallBalancesStore } from '~/core/state/currentSettings/hideSmallBalances';
 import { useTestnetModeStore } from '~/core/state/currentSettings/testnetMode';
 import { ParsedUserAsset } from '~/core/types/assets';
 import { truncateAddress } from '~/core/utils/address';
+import { getCustomChainIconUrl } from '~/core/utils/assets';
 import { isCustomChain } from '~/core/utils/chains';
 import {
   Box,
@@ -41,13 +34,13 @@ import { CoinRow } from '~/entries/popup/components/CoinRow/CoinRow';
 
 import { Asterisks } from '../../components/Asterisks/Asterisks';
 import { CoinbaseIcon } from '../../components/CoinbaseIcon/CoinbaseIcon';
+import ExternalImage from '../../components/ExternalImage/ExternalImage';
 import { QuickPromo } from '../../components/QuickPromo/QuickPromo';
+import { useBalances } from '../../hooks/useBalances';
 import useKeyboardAnalytics from '../../hooks/useKeyboardAnalytics';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
-import { useRainbowNavigate } from '../../hooks/useRainbowNavigate';
 import { useSystemSpecificModifierKey } from '../../hooks/useSystemSpecificModifierKey';
 import { useTokensShortcuts } from '../../hooks/useTokensShortcuts';
-import { ROUTES } from '../../urls';
 
 import { TokensSkeleton } from './Skeletons';
 import { TokenContextMenu } from './TokenDetails/TokenContextMenu';
@@ -55,86 +48,53 @@ import { TokenContextMenu } from './TokenDetails/TokenContextMenu';
 const TokenRow = memo(function TokenRow({
   token,
   testId,
+  onClickAsset,
+  tokenListByAsset,
 }: {
   token: ParsedUserAsset;
   testId: string;
+  tokenListByAsset: Map<string, ParsedUserAsset[]>;
+  onClickAsset: (uniqueId: string) => void;
 }) {
-  const navigate = useRainbowNavigate();
+  const openDetails = useCallback(() => {
+    onClickAsset(token.uniqueId!);
+  }, [onClickAsset, token]);
 
-  const openDetails = () =>
-    navigate(ROUTES.TOKEN_DETAILS(token.uniqueId), {
-      state: { skipTransitionOnRoute: ROUTES.HOME },
-    });
+  const isParent = useMemo(() => token.uniqueId == token.parentId, [token]);
 
   return (
     <TokenContextMenu token={token}>
-      <Box onClick={openDetails}>
-        <AssetRow asset={token} testId={testId} />
-      </Box>
+      {isParent ? (
+        <Box onClick={openDetails}>
+          <AssetRow
+            asset={token}
+            testId={testId}
+            tokenListByAsset={tokenListByAsset}
+          />
+        </Box>
+      ) : (
+        <Box onClick={openDetails} paddingLeft="16px">
+          <AssetRow asset={token} testId={testId} />
+        </Box>
+      )}
     </TokenContextMenu>
   );
 });
 
 export function Tokens() {
   const { currentAddress } = useCurrentAddressStore();
-  const { currentCurrency: currency } = useCurrentCurrencyStore();
   const [manuallyRefetchingTokens, setManuallyRefetchingTokens] =
     useState(false);
-  const { hideSmallBalances } = useHideSmallBalancesStore();
   const { trackShortcut } = useKeyboardAnalytics();
   const { modifierSymbol } = useSystemSpecificModifierKey();
 
   const {
-    data: assets = [],
-    isInitialLoading,
+    data: allAssets = [],
+    isLoading: isInitialLoading,
     refetch: refetchUserAssets,
-  } = useUserAssets(
-    {
-      address: currentAddress,
-      currency,
-    },
-    {
-      select: (data) =>
-        selectorFilterByUserChains({
-          data,
-          selector: hideSmallBalances
-            ? selectUserAssetsFilteringSmallBalancesList
-            : selectUserAssetsList,
-        }),
-    },
-  );
-
-  const {
-    data: customNetworkAssets = [],
-    refetch: refetchCustomNetworkAssets,
-  } = useCustomNetworkAssets(
-    {
-      address: currentAddress,
-      currency,
-    },
-    {
-      select: (data) =>
-        selectorFilterByUserChains({
-          data,
-          selector: hideSmallBalances
-            ? selectUserAssetsFilteringSmallBalancesList
-            : selectUserAssetsList,
-        }),
-    },
-  );
-
-  const allAssets = useMemo(
-    () =>
-      uniqBy(
-        [...assets, ...customNetworkAssets].sort(
-          (a: ParsedUserAsset, b: ParsedUserAsset) =>
-            parseFloat(b?.native?.balance?.amount) -
-            parseFloat(a?.native?.balance?.amount),
-        ),
-        'uniqueId',
-      ),
-    [assets, customNetworkAssets],
-  );
+    tokenListByAsset,
+    onCombineLists,
+  } = useBalances(currentAddress);
 
   const containerRef = useContainerRef();
   const assetsRowVirtualizer = useVirtualizer({
@@ -152,7 +112,7 @@ export function Tokens() {
           type: 'tokens.refresh',
         });
         setManuallyRefetchingTokens(true);
-        await Promise.all([refetchUserAssets(), refetchCustomNetworkAssets()]);
+        await Promise.all([refetchUserAssets()]);
         setManuallyRefetchingTokens(false);
       }
     },
@@ -216,7 +176,12 @@ export function Tokens() {
                 width="full"
                 style={{ height: size, y: start }}
               >
-                <TokenRow token={token} testId={`coin-row-item-${index}`} />
+                <TokenRow
+                  token={token}
+                  testId={`coin-row-item-${index}`}
+                  onClickAsset={onCombineLists}
+                  tokenListByAsset={tokenListByAsset}
+                />
               </Box>
             );
           })}
@@ -229,21 +194,28 @@ export function Tokens() {
 type AssetRowProps = {
   asset: ParsedUserAsset;
   testId?: string;
+  tokenListByAsset?: Map<string, ParsedUserAsset[]>;
 };
 
 export const AssetRow = memo(function AssetRow({
   asset,
   testId,
+  tokenListByAsset,
 }: AssetRowProps) {
   const name = asset?.name || asset?.symbol || truncateAddress(asset.address);
   const uniqueId = asset?.uniqueId;
   const { hideAssetBalances } = useHideAssetBalancesStore();
   const { currentCurrency } = useCurrentCurrencyStore();
 
-  const priceChange = asset?.native?.price?.change;
-  const priceChangeDisplay = priceChange?.length ? priceChange : '-';
-  const priceChangeColor =
-    priceChangeDisplay[0] !== '-' ? 'green' : 'labelTertiary';
+  // const priceChange = asset?.native?.price?.change;
+  // const priceChangeDisplay = priceChange?.length ? priceChange : '-';
+  // const priceChangeColor =
+  //   priceChangeDisplay[0] !== '-' ? 'green' : 'labelTertiary';
+
+  const isParent = useMemo(() => asset?.uniqueId == asset.parentId, [asset]);
+  const size = useMemo(() => {
+    return isParent ? 36 : 24;
+  }, [isParent]);
 
   const balanceDisplay = useMemo(
     () =>
@@ -254,12 +226,16 @@ export const AssetRow = memo(function AssetRow({
             {asset?.symbol}
           </TextOverflow>
         </Inline>
+      ) : isParent ? (
+        <TextOverflow color="labelTertiary" size="12pt" weight="regular">
+          {asset?.balance?.display}
+        </TextOverflow>
       ) : (
-        <TextOverflow color="labelTertiary" size="12pt" weight="semibold">
+        <TextOverflow color="labelTertiary" size="12pt" weight="regular">
           {asset?.balance?.display}
         </TextOverflow>
       ),
-    [asset?.balance?.display, asset?.symbol, hideAssetBalances],
+    [asset?.balance?.display, asset?.symbol, hideAssetBalances, isParent],
   );
 
   const nativeBalanceDisplay = useMemo(
@@ -271,9 +247,14 @@ export const AssetRow = memo(function AssetRow({
           </TextOverflow>
           <Asterisks color="label" size={10} />
         </Inline>
-      ) : isCustomChain(asset.chainId) &&
-        asset?.native?.balance?.amount === '0' ? null : (
+      ) : asset.chainId &&
+        isCustomChain(asset.chainId) &&
+        asset?.native?.balance?.amount === '0' ? null : isParent ? (
         <Text size="14pt" weight="semibold" align="right">
+          {asset?.native?.balance?.display}
+        </Text>
+      ) : (
+        <Text size="12pt" weight="semibold" align="right">
           {asset?.native?.balance?.display}
         </Text>
       ),
@@ -283,6 +264,7 @@ export const AssetRow = memo(function AssetRow({
       asset.chainId,
       asset?.native?.balance?.amount,
       asset?.native?.balance?.display,
+      isParent,
     ],
   );
 
@@ -291,9 +273,11 @@ export const AssetRow = memo(function AssetRow({
       <Columns>
         <Column>
           <Box paddingVertical="4px">
-            <TextOverflow size="14pt" weight="semibold">
-              {name}
-            </TextOverflow>
+            {isParent ? (
+              <TextOverflow size="14pt" weight="semibold">
+                {name}
+              </TextOverflow>
+            ) : null}
           </Box>
         </Column>
         <Column width="content">
@@ -301,19 +285,42 @@ export const AssetRow = memo(function AssetRow({
         </Column>
       </Columns>
     ),
-    [name, nativeBalanceDisplay],
+    [isParent, name, nativeBalanceDisplay],
   );
+
+  const chainsList = useMemo(() => {
+    if (!tokenListByAsset) return null;
+    const tokenChains = tokenListByAsset?.get(uniqueId!)?.map((token) => {
+      const src = getCustomChainIconUrl(token.chainId!, AddressZero);
+      return (
+        <ExternalImage
+          key={token.uniqueId}
+          src={src}
+          width={16}
+          height={16}
+          borderRadius={0}
+          style={{ padding: '2px' }}
+        />
+      );
+    });
+
+    return (
+      <Box style={{ height: '12px', display: 'flex', flexDirection: 'row' }}>
+        {tokenChains}
+      </Box>
+    );
+  }, [tokenListByAsset, uniqueId]);
 
   const bottomRow = useMemo(
     () => (
       <Columns>
-        <Column>
+        <Column>{isParent ? chainsList : null}</Column>
+        <Column width="content">
           <Box paddingVertical="4px" testId={`asset-name-${uniqueId}`}>
             {balanceDisplay}
           </Box>
-        </Column>
-        <Column width="content">
-          <Box paddingVertical="4px">
+
+          {/* <Box paddingVertical="4px">
             <Text
               color={priceChangeColor}
               size="12pt"
@@ -322,11 +329,11 @@ export const AssetRow = memo(function AssetRow({
             >
               {priceChangeDisplay}
             </Text>
-          </Box>
+          </Box> */}
         </Column>
       </Columns>
     ),
-    [balanceDisplay, priceChangeColor, priceChangeDisplay, uniqueId],
+    [balanceDisplay, chainsList, isParent, uniqueId],
   );
 
   return (
@@ -335,6 +342,8 @@ export const AssetRow = memo(function AssetRow({
       asset={asset}
       topRow={topRow}
       bottomRow={bottomRow}
+      size={size}
+      isParent={isParent}
     />
   );
 });

@@ -269,6 +269,8 @@ export const handleProviderRequest = ({
     try {
       let response = null;
 
+      // console.log('eth_ response', method, params);
+
       switch (method) {
         case 'eth_chainId': {
           response = activeSession
@@ -293,6 +295,7 @@ export const handleProviderRequest = ({
         case 'eth_signTypedData_v3':
         case 'eth_signTypedData_v4': {
           // If we need to validate the input before showing the UI, it should go here.
+          // console.log('eth_ params', params, meta.sender.url);
           if (method === 'eth_signTypedData_v4') {
             // we don't trust the params order
             let dataParam = params?.[1];
@@ -315,16 +318,18 @@ export const handleProviderRequest = ({
             }
           }
 
+          console.log('eth_ params', meta.sender.url);
           response = await messengerProviderRequest(popupMessenger, {
             method,
             id,
             params,
             meta,
           });
+          console.log('eth_ response', method, response);
           break;
         }
         case 'wallet_addEthereumChain': {
-          console.log('wallet_addEthereumChain params', params);
+          // console.log('wallet_addEthereumChain params', params);
           const { featureFlags } = featureFlagsStore.getState();
           const { rainbowChains, addCustomRPC, setActiveRPC } =
             rainbowChainsStore.getState();
@@ -469,9 +474,12 @@ export const handleProviderRequest = ({
               throw new Error('User rejected the request.');
             }
           }
+
+          // console.log('wallet_addEthereumChain response', response);
           break;
         }
         case 'wallet_watchAsset': {
+          // console.log('wallet_watchAsset params', params, meta.sender.url);
           const { featureFlags } = featureFlagsStore.getState();
           if (!featureFlags.custom_rpc && process.env.IS_TESTING === 'false') {
             throw new Error('Method not supported');
@@ -519,10 +527,17 @@ export const handleProviderRequest = ({
             });
             // PER EIP - true if the token was added, false otherwise.
             response = !!response;
+
+            // console.log('wallet_watchAsset response', response);
             break;
           }
         }
         case 'wallet_switchEthereumChain': {
+          // console.log(
+          //   'wallet_switchEthereumChain params',
+          //   params,
+          //   meta.sender.url,
+          // );
           const proposedChainId = Number(
             (params?.[0] as { chainId: ChainId })?.chainId,
           );
@@ -572,9 +587,11 @@ export const handleProviderRequest = ({
             inpageMessenger.send(`chainChanged:${host}`, proposedChainId);
           }
           response = null;
+          // console.log('wallet_switchEthereumChain response', response);
           break;
         }
         case 'eth_requestAccounts': {
+          // console.log('eth_requestAccounts params', params, meta.sender.url);
           if (activeSession) {
             response = [activeSession.address?.toLowerCase()];
             break;
@@ -595,15 +612,19 @@ export const handleProviderRequest = ({
             url,
           });
           response = [address?.toLowerCase()];
+          // console.log('eth_requestAccounts response', response);
           break;
         }
         case 'eth_blockNumber': {
+          // console.log('eth_blockNumber params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           const blockNumber = await provider.getBlockNumber();
           response = toHex(String(blockNumber));
+          // console.log('eth_blockNumber response', response);
           break;
         }
         case 'eth_getBlockByNumber': {
+          // console.log('eth_call params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           const block = await provider.getBlock(params?.[0] as string);
           response = {
@@ -616,12 +637,16 @@ export const handleProviderRequest = ({
           break;
         }
         case 'eth_getBalance': {
+          // console.log('eth_call params', params, meta.sender.url);
+          // console.log('eth_getBalance params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           const balance = await provider.getBalance(params?.[0] as string);
           response = toHex(balance.toString());
+          // console.log('eth_getBalance response', response);
           break;
         }
         case 'eth_getTransactionByHash': {
+          // console.log('eth_call params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           const transaction = await provider.getTransaction(
             params?.[0] as string,
@@ -650,30 +675,39 @@ export const handleProviderRequest = ({
           break;
         }
         case 'eth_call': {
+          // console.log('eth_call params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           response = await provider.call(params?.[0] as TransactionRequest);
+          // console.log('eth_call response', response);
           break;
         }
         case 'eth_estimateGas': {
+          // console.log('eth_estimateGas params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           const gas = await provider.estimateGas(
             params?.[0] as TransactionRequest,
           );
           response = toHex(gas.toString());
+          // console.log('eth_estimateGas response', response);
           break;
         }
         case 'eth_gasPrice': {
+          // console.log('eth_gasPrice params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           const gasPrice = await provider.getGasPrice();
           response = toHex(gasPrice.toString());
+          // console.log('eth_gasPrice response', response);
           break;
         }
         case 'eth_getCode': {
+          // console.log('eth_getCode params', params, meta.sender.url);
           const provider = getProvider({ chainId: activeSession?.chainId });
           response = await provider.getCode(
             params?.[0] as string,
             params?.[1] as string,
           );
+
+          // console.log('eth_getCode response', response);
           break;
         }
         case 'personal_ecRecover': {
@@ -690,12 +724,14 @@ export const handleProviderRequest = ({
               // Generic error that will be hanlded correctly in the catch
               throw new Error('next');
             }
+            // console.log('wallet_ params', method, params, meta.sender.url);
             // Let's try to fwd the request to the provider
             const provider = getProvider({
               chainId: activeSession?.chainId,
             }) as StaticJsonRpcProvider;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             response = await provider.send(method, params as any[]);
+            // console.log('wallet_ response', response);
           } catch (e) {
             // TODO: handle other methods
             logger.error(new RainbowError('Unhandled provider request'), {
